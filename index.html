@@ -661,10 +661,10 @@
         // 更新到飞书
         async function updateToFeishu() {
             const config = paramsData[currentConfig];
-            // 直接调用飞书webhook，不需要代理服务器
+            // 直接调用飞书webhook
             const webhookUrl = 'https://zyt.feishu.cn/base/automation/webhook/event/IVR5aXAKlwwx3phIzSvczyiVnAg';
             
-            if (!confirm('确定要更新当前配置到飞书表格吗？\n\n配置: ' + config.name)) {
+            if (!confirm('确定要更新当前配置到飞书表格吗？\n\n配置: ' + config.name + '\n\n提示：如果浏览器提示CORS错误，请使用"生成PowerShell命令"功能')) {
                 return;
             }
             
@@ -685,9 +685,9 @@
                 const response = await fetch(webhookUrl, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
+                        'Content-Type': 'application/json; charset=utf-8',
                     },
-                    mode: 'cors', // 明确指定跨域模式
+                    mode: 'cors',
                     body: JSON.stringify(payload)
                 });
                 
@@ -703,7 +703,13 @@
                 }
             } catch (error) {
                 console.error('网络错误:', error);
-                alert('❌ 网络错误\n\n错误: ' + error.message + '\n\n可能原因:\n1. CORS 策略阻止（浏览器不允许本地文件访问外部 API）\n2. 网络连接问题\n\n解决方案:\n- 双击运行 "start_editor_server.bat" 启动本地服务器\n- 然后访问 http://localhost:8080/vfm_radar_editor.html\n- 或者使用"📋 复制到剪贴板"功能手动更新');
+                
+                // 检查是否是CORS错误
+                if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
+                    alert('❌ CORS限制\n\n浏览器不允许直接访问飞书webhook。\n\n解决方案：\n1. 使用"🔧 生成 PowerShell 命令"功能\n2. 或者联系我配置代理服务器');
+                } else {
+                    alert('❌ 网络错误\n\n错误: ' + error.message);
+                }
             }
         }
 
