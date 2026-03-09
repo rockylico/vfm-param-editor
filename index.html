@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VFM-E2E 参数雷达图编辑器</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+        }
+        h1 { text-align: center; color: #333; margin-bottom: 10px; font-size: 28px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 14px; }
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        .chart-section { background: #f8f9fa; padding: 20px; border-radius: 15px; }
+        .edit-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            max-height: 800px;
+            overflow-y: auto;
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .control-group {
+            background: white;
+            padding: 12px 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .control-group label { font-weight: bold; color: #555; margin-right: 10px; }
+        .control-group select {
+            padding: 8px 15px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #5470c6; color: white; }
+        .btn-primary:hover { background: #3a5bc7; }
+        .btn-success { background: #91cc75; color: white; }
+        .btn-success:hover { background: #73c0de; }
+        .btn-warning { background: #fac858; color: #333; }
+        .btn-warning:hover { background: #ee6666; color: white; }
+        #radarChart { width: 100%; height: 700px; }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .info-box h3 { margin: 0 0 10px 0; color: #1976D2; font-size: 16px; }
+        .info-box ul { margin: 0; padding-left: 20px; }
+        .info-box li { margin: 5px 0; color: #555; font-size: 13px; }
+        .category-selector {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .category-btn {
+            padding: 6px 14px;
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 13px;
+        }
+        .category-btn.active {
+            background: #5470c6;
+            color: white;
+            border-color: #5470c6;
+        }
+        .category-btn:hover { background: #5470c6; color: white; }
+        .indicator-item {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+        .indicator-item:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.15); }
+        .indicator-item.modified { border-left: 3px solid #ff9800; }
+        .indicator-name { font-size: 13px; color: #333; margin-bottom: 8px; font-weight: 500; }
+        .indicator-controls { display: flex; align-items: center; gap: 10px; }
+        .indicator-slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: #e0e0e0;
+            outline: none;
+        }
+        .indicator-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #5470c6;
+            cursor: pointer;
+        }
+        .indicator-value {
+            width: 60px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .stats {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        .stat-item {
+            background: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-label { color: #666; font-size: 11px; margin-bottom: 3px; }
+        .stat-value { font-size: 20px; font-weight: bold; color: #333; }
+        .export-area {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .export-area h3 { margin-bottom: 10px; color: #333; }
+        .export-area textarea {
+            width: 100%;
+            height: 250px;
+            font-family: monospace;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 11px;
+        }
+        .edit-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #5470c6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 VFM-E2E 参数雷达图编辑器</h1>
+        <p class="subtitle">可视化对比 + 滑块调整 | 实时同步更新</p>
+
+        <div class="info-box">
+            <h3>💡 使用说明</h3>
+            <ul>
+                <li><strong>左侧雷达图</strong> - 实时展示参数分布，可拖动/缩放查看</li>
+                <li><strong>右侧滑块</strong> - 拖动滑块调整参数值，实时同步到雷达图</li>
+                <li><strong>分类查看</strong> - 点击分类按钮查看不同类别的指标</li>
+                <li><strong>更新到飞书</strong> - 需要先启动代理服务器（见下方说明）</li>
+            </ul>
+            <details style="margin-top: 10px;">
+                <summary style="cursor: pointer; color: #1976D2; font-weight: bold;">🔧 如何启动代理服务器</summary>
+                <div style="margin-top: 10px; padding: 10px; background: white; border-radius: 5px;">
+                    <p style="margin-bottom: 10px;"><strong>方法1：使用Python启动（推荐）</strong></p>
+                    <ol style="margin-left: 20px; margin-bottom: 15px;">
+                        <li>下载 <code>start_proxy.py</code> 文件</li>
+                        <li>在终端运行: <code style="background: #f0f0f0; padding: 2px 6px; border-radius: 3px;">python3 start_proxy.py</code></li>
+                        <li>看到"服务器已启动"提示即可</li>
+                    </ol>
+                    <p style="margin-bottom: 10px;"><strong>方法2：使用备用方案</strong></p>
+                    <ol style="margin-left: 20px;">
+                        <li>如果无法启动代理，点击"📋 复制到剪贴板"</li>
+                        <li>将JSON数据发送给助手</li>
+                        <li>助手会通过API直接更新表格</li>
+                    </ol>
+                </div>
+            </details>
+        </div>
+
+        <div class="stats">
+            <div class="stat-item">
+                <div class="stat-label">当前配置</div>
+                <div class="stat-value" id="currentConfigName">得分权重</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">显示指标</div>
+                <div class="stat-value" id="indicatorCount">0</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">已修改</div>
+                <div class="stat-value" id="modifiedCount">0</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>选择配置:</label>
+                <select id="configSelect" onchange="switchConfig(this.value)">
+                    <option value="weight">得分权重</option>
+                    <option value="optimal_threshold">优化上限阈值</option>
+                    <option value="degrade_threshold">退化上限阈值</option>
+                    <option value="optimal_score">优化上限阈值分数</option>
+                    <option value="degrade_score">退化上限阈值分数</option>
+                </select>
+            </div>
+            <button class="btn-primary" onclick="generatePowerShell()">🔧 生成 PowerShell 命令</button>
+            <button class="btn-success" onclick="exportJSON()">📥 导出JSON</button>
+            <button class="btn-success" onclick="copyToClipboard()">📋 复制到剪贴板</button>
+            <button class="btn-warning" onclick="resetChanges()">🔄 重置修改</button>
+        </div>
+
+        <div class="category-selector" id="categorySelector"></div>
+
+        <div class="main-content">
+            <div class="chart-section">
+                <div id="radarChart"></div>
+            </div>
+            <div class="edit-section">
+                <div class="edit-title">参数调整</div>
+                <div id="indicatorList"></div>
+            </div>
+        </div>
+
+        <div class="export-area" id="exportArea">
+            <h3>导出的JSON数据：</h3>
+            <textarea id="exportData" readonly></textarea>
+        </div>
+    </div>
+
+    <script>
+        // 9个大专题的顺序（按照飞书表格）
+        const MAJOR_CATEGORIES = [
+            "纵向安全总分",
+            "纵向效率总分",
+            "横向安全总分",
+            "横向违规总分",
+            "横向领航总分",
+            "横向偏离总分",
+            "静态障碍物总分",
+            "红绿灯总分",
+            "夜间专题总分"
+        ];
+
+        // 参数数据（从飞书获取）
+        const paramsData = {
+            weight: {
+                name: "得分权重",
+                record_id: "recvcYYtOC5pgz",
+                range: [0, 1],
+                categories: {
+                    "纵向安全": ["跟车溜车(纵向)↓", "跟车过近(纵向)↓", "绕行安全(纵向)↓", "合流安全(纵向)↓", "无保护左转(纵向)↓", "行人横穿(纵向)↓", "远距离车应对(纵向)↓", "大车加塞安全(纵向)↓", "直道车速过快(纵向)↓", "大曲率弯道车速过快(纵向)↓", "加塞应对(纵向)↓", "高速跟车过近(纵向)↓"],
+                    "纵向效率": ["起步提速(纵向)↑", "低速提速(纵向)↑", "中速提速(纵向)↑", "跟车过远(纵向)↑", "绕行提速(纵向)↑", "静止车绕行能力(纵向)↑", "慢速VRU绕行能力(纵向)↑", "减速驻停车绕行能力(纵向)↑"],
+                    "红绿灯": ["e2e_红灯刹停(纵向)↓", "e2e_红灯误起步(纵向)↓", "e2e_绿灯闪烁刹停(纵向)↓", "e2e_黄灯刹停(纵向)↓", "e2e_红灯误起步左转箭头(纵向)↓", "e2e_黄闪误刹(纵向)↑", "绿灯误刹(纵向)↑"],
+                    "横向安全": ["侧向贴贴(横向)↓", "左绕行侧向贴贴(横向)↓", "右绕行侧向贴贴(横向)↓"],
+                    "横向违规": ["车道级直行左分流（横向）↓", "车道级左转左分流（横向）↓", "车道级直行右分流（横向）↓", "车道级右转右分流（横向）↓", "车道级左转左变道(横向)↓", "车道级直行左变道(横向)↓", "车道级右转右变道(横向)↓", "车道级直行右变道(横向)↓"],
+                    "横向领航": ["道路级左分流↓", "道路级右分流↓", "拐大弯(横向)↓", "拐小弯(横向)↓", "转向障碍物侧偏(横向)↓"],
+                    "横向偏离": ["直道居中(横向)↓", "直道居中偏左(横向)↓", "直道居中偏右(横向)↓", "弯道居中(横向)↓", "弯道居中偏左(横向)↓", "弯道居中偏右(横向)↓", "大曲率弯道居中(横向-2s)↓", "大曲率弯道居中偏左(横向-2s)↓", "大曲率弯道居中偏右(横向-2s)↓", "高速直道居中(横向-2s)↓", "高速直道居中偏左(横向-2s)↓", "高速直道居中偏右(横向-2s)↓", "高速弯道居中(横向-2s)↓", "高速弯道居中偏左(横向-2s)↓", "高速弯道居中偏右(横向-2s)↓", "高速误超车(横向-2s)↓"],
+                    "静态障碍物": ["弯道障碍物侧偏(横向)↓", "直行障碍物避让(横向)↓", "直行障碍物侧偏(横向)↓", "弯道障碍物避让(横向)↓", "长尾障碍物应对(横向)↓", "误绕行(横向)↓", "误绕行-左(横向)↓", "误绕行-右(横向)↓"],
+                    "夜间专题": ["夜间安全(纵向)↓", "夜间提速(纵向)↑", "夜间误刹车(纵向)↑", "夜间跟车过远(纵向)↑"]
+                },
+                majorScores: {
+                    "纵向安全总分": 1,
+                    "纵向效率总分": 0.5,
+                    "横向安全总分": 1,
+                    "横向违规总分": 0.5,
+                    "横向领航总分": 0.5,
+                    "横向偏离总分": 0.3,
+                    "静态障碍物总分": 1,
+                    "红绿灯总分": 0.3,
+                    "夜间专题总分": 0.2
+                },
+                values: {
+                    "跟车溜车(纵向)↓": 1, "跟车过近(纵向)↓": 1, "绕行安全(纵向)↓": 1, "合流安全(纵向)↓": 0.5,
+                    "无保护左转(纵向)↓": 0.5, "行人横穿(纵向)↓": 1, "远距离车应对(纵向)↓": 0.1, "大车加塞安全(纵向)↓": 1,
+                    "直道车速过快(纵向)↓": 0.5, "大曲率弯道车速过快(纵向)↓": 1, "加塞应对(纵向)↓": 0.1, "高速跟车过近(纵向)↓": 1,
+                    "起步提速(纵向)↑": 0.5, "低速提速(纵向)↑": 0.2, "中速提速(纵向)↑": 0.2, "跟车过远(纵向)↑": 0.2,
+                    "绕行提速(纵向)↑": 0.5, "静止车绕行能力(纵向)↑": 0.5, "慢速VRU绕行能力(纵向)↑": 0.5, "减速驻停车绕行能力(纵向)↑": 0.5,
+                    "e2e_红灯刹停(纵向)↓": 1, "e2e_红灯误起步(纵向)↓": 1, "e2e_绿灯闪烁刹停(纵向)↓": 0.5, "e2e_黄灯刹停(纵向)↓": 1,
+                    "e2e_红灯误起步左转箭头(纵向)↓": 1, "e2e_黄闪误刹(纵向)↑": 0.5, "绿灯误刹(纵向)↑": 0.5,
+                    "侧向贴贴(横向)↓": 1, "左绕行侧向贴贴(横向)↓": 1, "右绕行侧向贴贴(横向)↓": 1,
+                    "车道级直行左分流（横向）↓": 1, "车道级左转左分流（横向）↓": 1, "车道级直行右分流（横向）↓": 1, "车道级右转右分流（横向）↓": 1,
+                    "车道级左转左变道(横向)↓": 1, "车道级直行左变道(横向)↓": 1, "车道级右转右变道(横向)↓": 1, "车道级直行右变道(横向)↓": 1,
+                    "道路级左分流↓": 0.5, "道路级右分流↓": 0.5, "拐大弯(横向)↓": 1, "拐小弯(横向)↓": 1, "转向障碍物侧偏(横向)↓": 0.5,
+                    "直道居中(横向)↓": 1, "直道居中偏左(横向)↓": 1, "直道居中偏右(横向)↓": 1,
+                    "弯道居中(横向)↓": 1, "弯道居中偏左(横向)↓": 1, "弯道居中偏右(横向)↓": 1,
+                    "大曲率弯道居中(横向-2s)↓": 1, "大曲率弯道居中偏左(横向-2s)↓": 1, "大曲率弯道居中偏右(横向-2s)↓": 1,
+                    "高速直道居中(横向-2s)↓": 1, "高速直道居中偏左(横向-2s)↓": 1, "高速直道居中偏右(横向-2s)↓": 1,
+                    "高速弯道居中(横向-2s)↓": 1, "高速弯道居中偏左(横向-2s)↓": 1, "高速弯道居中偏右(横向-2s)↓": 1,
+                    "高速误超车(横向-2s)↓": 1,
+                    "弯道障碍物侧偏(横向)↓": 0.5, "直行障碍物避让(横向)↓": 0.5, "直行障碍物侧偏(横向)↓": 0.5,
+                    "弯道障碍物避让(横向)↓": 0.5, "长尾障碍物应对(横向)↓": 0.5,
+                    "误绕行(横向)↓": 0.5, "误绕行-左(横向)↓": 1, "误绕行-右(横向)↓": 1,
+                    "夜间安全(纵向)↓": 1, "夜间提速(纵向)↑": 0.5, "夜间误刹车(纵向)↑": 0.5, "夜间跟车过远(纵向)↑": 0.5
+                }
+            },
+            optimal_threshold: {
+                name: "优化上限阈值",
+                record_id: "recvcYYENh5pP5",
+                range: [0, 1],
+                categories: {
+                    "纵向安全": ["跟车溜车(纵向)↓", "跟车过近(纵向)↓", "绕行安全(纵向)↓", "合流安全(纵向)↓", "无保护左转(纵向)↓", "行人横穿(纵向)↓", "远距离车应对(纵向)↓", "大车加塞安全(纵向)↓", "直道车速过快(纵向)↓", "大曲率弯道车速过快(纵向)↓", "加塞应对(纵向)↓", "高速跟车过近(纵向)↓"],
+                    "纵向效率": ["起步提速(纵向)↑", "低速提速(纵向)↑", "中速提速(纵向)↑", "跟车过远(纵向)↑", "绕行提速(纵向)↑", "静止车绕行能力(纵向)↑", "慢速VRU绕行能力(纵向)↑", "减速驻停车绕行能力(纵向)↑"],
+                    "红绿灯": ["e2e_红灯刹停(纵向)↓", "e2e_红灯误起步(纵向)↓", "e2e_绿灯闪烁刹停(纵向)↓", "e2e_黄灯刹停(纵向)↓", "e2e_红灯误起步左转箭头(纵向)↓", "e2e_黄闪误刹(纵向)↑", "绿灯误刹(纵向)↑"]
+                },
+                majorScores: {
+                    "纵向安全总分": 0.3, "纵向效率总分": 0.6, "横向安全总分": 0.3, "横向违规总分": 0.3,
+                    "横向领航总分": 0.5, "横向偏离总分": 0.3, "静态障碍物总分": 0.3, "红绿灯总分": 0.3, "夜间专题总分": 0.3
+                },
+                values: {
+                    "跟车溜车(纵向)↓": 0.3, "跟车过近(纵向)↓": 1, "绕行安全(纵向)↓": 0.3, "合流安全(纵向)↓": 0.3,
+                    "无保护左转(纵向)↓": 0.3, "行人横穿(纵向)↓": 0.3, "远距离车应对(纵向)↓": 0.3, "大车加塞安全(纵向)↓": 0.3,
+                    "直道车速过快(纵向)↓": 0.3, "大曲率弯道车速过快(纵向)↓": 0.3, "加塞应对(纵向)↓": 0.3, "高速跟车过近(纵向)↓": 0.3,
+                    "起步提速(纵向)↑": 0.6, "低速提速(纵向)↑": 0.6, "中速提速(纵向)↑": 0.6, "跟车过远(纵向)↑": 0.6,
+                    "绕行提速(纵向)↑": 0.6, "静止车绕行能力(纵向)↑": 0.6, "慢速VRU绕行能力(纵向)↑": 0.6, "减速驻停车绕行能力(纵向)↑": 0.6,
+                    "e2e_红灯刹停(纵向)↓": 0.3, "e2e_红灯误起步(纵向)↓": 0.2, "e2e_绿灯闪烁刹停(纵向)↓": 0.3, "e2e_黄灯刹停(纵向)↓": 0.3,
+                    "e2e_红灯误起步左转箭头(纵向)↓": 0.2, "e2e_黄闪误刹(纵向)↑": 0.3, "绿灯误刹(纵向)↑": 0.3
+                }
+            },
+            degrade_threshold: {
+                name: "退化上限阈值",
+                record_id: "recvcYZlKm7g43",
+                range: [-1, 0],
+                categories: {
+                    "纵向安全": ["跟车溜车(纵向)↓", "跟车过近(纵向)↓", "绕行安全(纵向)↓", "合流安全(纵向)↓", "无保护左转(纵向)↓", "行人横穿(纵向)↓", "远距离车应对(纵向)↓", "大车加塞安全(纵向)↓", "直道车速过快(纵向)↓", "大曲率弯道车速过快(纵向)↓", "加塞应对(纵向)↓", "高速跟车过近(纵向)↓"],
+                    "纵向效率": ["起步提速(纵向)↑", "低速提速(纵向)↑", "中速提速(纵向)↑", "跟车过远(纵向)↑", "绕行提速(纵向)↑", "静止车绕行能力(纵向)↑", "慢速VRU绕行能力(纵向)↑", "减速驻停车绕行能力(纵向)↑"],
+                    "红绿灯": ["e2e_红灯刹停(纵向)↓", "e2e_红灯误起步(纵向)↓", "e2e_绿灯闪烁刹停(纵向)↓", "e2e_黄灯刹停(纵向)↓", "e2e_红灯误起步左转箭头(纵向)↓", "e2e_黄闪误刹(纵向)↑", "绿灯误刹(纵向)↑"]
+                },
+                majorScores: {
+                    "纵向安全总分": -0.3, "纵向效率总分": -0.6, "横向安全总分": -0.3, "横向违规总分": -0.3,
+                    "横向领航总分": -0.5, "横向偏离总分": -0.3, "静态障碍物总分": -0.3, "红绿灯总分": -0.3, "夜间专题总分": -0.3
+                },
+                values: {
+                    "跟车溜车(纵向)↓": -0.3, "跟车过近(纵向)↓": -1, "绕行安全(纵向)↓": -0.3, "合流安全(纵向)↓": -0.3,
+                    "无保护左转(纵向)↓": -0.3, "行人横穿(纵向)↓": -0.3, "远距离车应对(纵向)↓": -0.3, "大车加塞安全(纵向)↓": -0.3,
+                    "直道车速过快(纵向)↓": -0.3, "大曲率弯道车速过快(纵向)↓": -0.3, "加塞应对(纵向)↓": -0.3, "高速跟车过近(纵向)↓": -0.3,
+                    "起步提速(纵向)↑": -0.6, "低速提速(纵向)↑": -0.6, "中速提速(纵向)↑": -0.6, "跟车过远(纵向)↑": -0.6,
+                    "绕行提速(纵向)↑": -0.6, "静止车绕行能力(纵向)↑": -0.6, "慢速VRU绕行能力(纵向)↑": -0.6, "减速驻停车绕行能力(纵向)↑": -0.6,
+                    "e2e_红灯刹停(纵向)↓": -0.3, "e2e_红灯误起步(纵向)↓": -0.2, "e2e_绿灯闪烁刹停(纵向)↓": -0.3, "e2e_黄灯刹停(纵向)↓": -0.3,
+                    "e2e_红灯误起步左转箭头(纵向)↓": -0.2, "e2e_黄闪误刹(纵向)↑": -0.3, "绿灯误刹(纵向)↑": -0.3
+                }
+            },
+            optimal_score: {
+                name: "优化上限阈值分数",
+                record_id: "recvcZ2Fw7vESK",
+                range: [0, 10],
+                categories: {},
+                majorScores: {
+                    "纵向安全总分": 10, "纵向效率总分": 10, "横向安全总分": 10, "横向违规总分": 10,
+                    "横向领航总分": 10, "横向偏离总分": 10, "静态障碍物总分": 10, "红绿灯总分": 10, "夜间专题总分": 10
+                },
+                values: {}
+            },
+            degrade_score: {
+                name: "退化上限阈值分数",
+                record_id: "recvcZ2KIf22Sx",
+                range: [-10, 0],
+                categories: {},
+                majorScores: {
+                    "纵向安全总分": -10, "纵向效率总分": -10, "横向安全总分": -10, "横向违规总分": -10,
+                    "横向领航总分": -10, "横向偏离总分": -10, "静态障碍物总分": -10, "红绿灯总分": -10, "夜间专题总分": -10
+                },
+                values: {}
+            }
+        };
+
+        // 原始数据备份
+        const originalData = JSON.parse(JSON.stringify(paramsData));
+
+        // 当前状态
+        let currentConfig = 'weight';
+        let currentCategory = 'all';
+
+        // 初始化
+        window.onload = function() {
+            renderCategoryButtons();
+            renderIndicatorList();
+            renderChart();
+            updateStats();
+        };
+
+        // 渲染分类按钮
+        function renderCategoryButtons() {
+            const container = document.getElementById('categorySelector');
+            container.innerHTML = '<button class="category-btn active" onclick="switchCategory(\'all\')">全部</button>';
+            
+            const categories = paramsData[currentConfig].categories;
+            for (const categoryName of Object.keys(categories)) {
+                const btn = document.createElement('button');
+                btn.className = 'category-btn';
+                btn.textContent = categoryName;
+                btn.onclick = () => switchCategory(categoryName);
+                container.appendChild(btn);
+            }
+        }
+
+        // 切换分类
+        function switchCategory(categoryName) {
+            currentCategory = categoryName;
+            
+            const buttons = document.querySelectorAll('.category-btn');
+            buttons.forEach(btn => {
+                btn.classList.remove('active');
+                if ((categoryName === 'all' && btn.textContent === '全部') || btn.textContent === categoryName) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            renderIndicatorList();
+            renderChart();
+            updateStats();
+        }
+
+        // 渲染指标列表
+        function renderIndicatorList() {
+            const container = document.getElementById('indicatorList');
+            const config = paramsData[currentConfig];
+            const original = originalData[currentConfig];
+            
+            let indicators = [];
+            if (currentCategory === 'all') {
+                // 显示9个大专题得分权重（按照固定顺序）
+                indicators = MAJOR_CATEGORIES;
+            } else {
+                indicators = config.categories[currentCategory] || [];
+            }
+            
+            container.innerHTML = '';
+            
+            indicators.forEach(indicator => {
+                const value = currentCategory === 'all' ? config.majorScores[indicator] : config.values[indicator];
+                const originalValue = currentCategory === 'all' ? original.majorScores[indicator] : original.values[indicator];
+                const isModified = value !== originalValue;
+                const range = config.range;
+                
+                const item = document.createElement('div');
+                item.className = `indicator-item ${isModified ? 'modified' : ''}`;
+                item.innerHTML = `
+                    <div class="indicator-name">${indicator}</div>
+                    <div class="indicator-controls">
+                        <input type="range" 
+                               class="indicator-slider" 
+                               min="${range[0]}" 
+                               max="${range[1]}" 
+                               step="0.1" 
+                               value="${value}"
+                               oninput="updateIndicator('${indicator}', this.value, ${currentCategory === 'all'})">
+                        <input type="number" 
+                               class="indicator-value" 
+                               value="${value}" 
+                               step="0.1"
+                               onchange="updateIndicator('${indicator}', this.value, ${currentCategory === 'all'})">
+                    </div>
+                `;
+                
+                container.appendChild(item);
+            });
+            
+            document.getElementById('indicatorCount').textContent = indicators.length;
+        }
+
+        // 更新指标值
+        function updateIndicator(indicator, value, isMajor) {
+            const numValue = parseFloat(value);
+            
+            if (isMajor) {
+                paramsData[currentConfig].majorScores[indicator] = numValue;
+            } else {
+                paramsData[currentConfig].values[indicator] = numValue;
+            }
+            
+            // 同步更新滑块和输入框
+            const items = document.querySelectorAll('.indicator-item');
+            items.forEach(item => {
+                const name = item.querySelector('.indicator-name').textContent;
+                if (name === indicator) {
+                    item.querySelector('.indicator-slider').value = numValue;
+                    item.querySelector('.indicator-value').value = numValue;
+                    
+                    const original = isMajor ? 
+                        originalData[currentConfig].majorScores[indicator] : 
+                        originalData[currentConfig].values[indicator];
+                    
+                    if (numValue !== original) {
+                        item.classList.add('modified');
+                    } else {
+                        item.classList.remove('modified');
+                    }
+                }
+            });
+            
+            renderChart();
+            updateModifiedCount();
+        }
+
+        // 渲染雷达图
+        function renderChart() {
+            const config = paramsData[currentConfig];
+            let indicators = [], values = [];
+            
+            if (currentCategory === 'all') {
+                // 显示9个大专题得分权重（按照固定顺序）
+                indicators = MAJOR_CATEGORIES;
+                values = indicators.map(key => config.majorScores[key]);
+            } else {
+                indicators = config.categories[currentCategory] || [];
+                values = indicators.map(key => config.values[key] || 0);
+            }
+            
+            if (indicators.length === 0) return;
+            
+            const r = [...values, values[0]];
+            const theta = [...indicators, indicators[0]];
+            
+            const trace = {
+                type: 'scatterpolar',
+                r: r,
+                theta: theta,
+                name: config.name,
+                line: { color: '#5470c6', width: 3 },
+                fill: 'toself',
+                fillcolor: '#5470c620',
+                mode: 'lines+markers',
+                marker: { size: 8, color: '#5470c6' }
+            };
+            
+            const layout = {
+                title: {
+                    text: `${config.name} - ${currentCategory === 'all' ? '大专题权重' : currentCategory}`,
+                    font: { size: 18, color: '#333' }
+                },
+                polar: {
+                    radialaxis: {
+                        visible: true,
+                        range: config.range,
+                        tickfont: { size: 11 }
+                    },
+                    angularaxis: {
+                        tickfont: { size: 10, color: '#333' },
+                        rotation: 90,
+                        direction: 'clockwise'
+                    }
+                },
+                showlegend: false,
+                margin: { t: 80, r: 100, b: 50, l: 100 },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(0,0,0,0)',
+                dragmode: 'pan'
+            };
+            
+            Plotly.react('radarChart', [trace], layout, {
+                responsive: true,
+                displayModeBar: true,
+                scrollZoom: true,
+                displaylogo: false
+            });
+        }
+
+        // 更新修改计数
+        function updateModifiedCount() {
+            const config = paramsData[currentConfig];
+            const original = originalData[currentConfig];
+            let count = 0;
+            
+            for (const [key, value] of Object.entries(config.values)) {
+                if (value !== original.values[key]) count++;
+            }
+            
+            for (const [key, value] of Object.entries(config.majorScores)) {
+                if (value !== original.majorScores[key]) count++;
+            }
+            
+            document.getElementById('modifiedCount').textContent = count;
+        }
+
+        // 切换配置
+        function switchConfig(configName) {
+            currentConfig = configName;
+            currentCategory = 'all';
+            
+            document.getElementById('currentConfigName').textContent = paramsData[configName].name;
+            renderCategoryButtons();
+            renderIndicatorList();
+            renderChart();
+            updateStats();
+        }
+
+        // 导出JSON
+        function exportJSON() {
+            const exportData = {
+                timestamp: new Date().toISOString(),
+                config: currentConfig,
+                configName: paramsData[currentConfig].name,
+                record_id: paramsData[currentConfig].record_id,
+                majorScores: paramsData[currentConfig].majorScores,
+                values: paramsData[currentConfig].values
+            };
+            
+            const jsonStr = JSON.stringify(exportData, null, 2);
+            document.getElementById('exportData').value = jsonStr;
+            document.getElementById('exportArea').style.display = 'block';
+        }
+
+        // 复制到剪贴板
+        function copyToClipboard() {
+            exportJSON();
+            const textarea = document.getElementById('exportData');
+            textarea.select();
+            document.execCommand('copy');
+            alert('✅ 已复制到剪贴板！\n\n请将JSON数据发送给我，我会帮你更新到飞书表格。');
+        }
+
+        // 重置修改
+        function resetChanges() {
+            if (confirm('确定要重置所有修改吗？')) {
+                paramsData[currentConfig] = JSON.parse(JSON.stringify(originalData[currentConfig]));
+                renderIndicatorList();
+                renderChart();
+                updateStats();
+            }
+        }
+
+        // 更新到飞书
+        async function updateToFeishu() {
+            const config = paramsData[currentConfig];
+            // 直接调用飞书webhook，不需要代理服务器
+            const webhookUrl = 'https://zyt.feishu.cn/base/automation/webhook/event/IVR5aXAKlwwx3phIzSvczyiVnAg';
+            
+            if (!confirm('确定要更新当前配置到飞书表格吗？\n\n配置: ' + config.name)) {
+                return;
+            }
+            
+            // 准备要发送的数据
+            const payload = {
+                config: currentConfig,
+                configName: config.name,
+                record_id: config.record_id,
+                timestamp: new Date().toISOString(),
+                majorScores: config.majorScores,
+                values: config.values
+            };
+            
+            console.log('准备发送数据到飞书webhook...');
+            console.log('数据:', payload);
+            
+            try {
+                const response = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    mode: 'cors', // 明确指定跨域模式
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                console.log('响应:', result);
+                
+                if (response.ok || result.success) {
+                    alert('✅ 更新成功！\n\n数据已成功更新到飞书表格。');
+                    console.log('更新成功:', result);
+                } else {
+                    alert('❌ 更新失败\n\n' + (result.message || result.error || '未知错误'));
+                    console.error('更新失败:', result);
+                }
+            } catch (error) {
+                console.error('网络错误:', error);
+                alert('❌ 网络错误\n\n错误: ' + error.message + '\n\n可能原因:\n1. CORS 策略阻止（浏览器不允许本地文件访问外部 API）\n2. 网络连接问题\n\n解决方案:\n- 双击运行 "start_editor_server.bat" 启动本地服务器\n- 然后访问 http://localhost:8080/vfm_radar_editor.html\n- 或者使用"📋 复制到剪贴板"功能手动更新');
+            }
+        }
+
+        // 更新统计
+        function updateStats() {
+            const config = paramsData[currentConfig];
+            let count = 0;
+            
+            if (currentCategory === 'all') {
+                count = MAJOR_CATEGORIES.length;
+            } else {
+                count = (config.categories[currentCategory] || []).length;
+            }
+            
+            document.getElementById('indicatorCount').textContent = count;
+            updateModifiedCount();
+        }
+
+        // 生成PowerShell命令
+        function generatePowerShell() {
+            const config = paramsData[currentConfig];
+            
+            // 构建请求数据
+            const payload = {
+                config: currentConfig,
+                configName: config.name,
+                record_id: config.record_id,
+                timestamp: new Date().toISOString(),
+                majorScores: config.majorScores,
+                values: config.values
+            };
+            
+            // 生成JSON（单行，避免命令行问题）
+            const jsonString = JSON.stringify(payload);
+            
+            // 保存JSON到文件，然后用curl发送
+            const curlCommand = `# 保存JSON到临时文件（避免PowerShell编码问题）
+$json = @'
+${jsonString}
+'@
+$json | Out-File -FilePath "vfm_update.json" -Encoding UTF8
+
+# 用curl发送请求（明确指定UTF-8编码）
+curl -X POST "https://zyt.feishu.cn/base/automation/webhook/event/IVR5aXAKlwwx3phIzSvczyiVnAg" -H "Content-Type: application/json; charset=utf-8" --data-binary "@vfm_update.json"`;
+            
+            // 复制到剪贴板
+            navigator.clipboard.writeText(curlCommand).then(() => {
+                alert('✅ 命令已复制到剪贴板！\n\n使用方法：\n1. 打开 PowerShell\n2. 粘贴命令（Ctrl+V）\n3. 按回车运行\n\n会生成 vfm_update.json 文件并发送\n配置: ' + config.name);
+            }).catch(err => {
+                // 如果剪贴板失败，显示在对话框中
+                prompt('复制以下命令，然后在 PowerShell 中运行：', curlCommand);
+            });
+        }
+    </script>
+</body>
+</html>
